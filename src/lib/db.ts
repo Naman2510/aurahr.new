@@ -26,6 +26,9 @@ export type Candidate = {
   source?: string; gender?: string;
   interviewLogs?: InterviewLog[];
   assessments?: CandidateAssessment[];
+  recruiterRating?: number;
+  recruiterFeedback?: string;
+  aiSummary?: string;
 };
 
 export type JobDescription = {

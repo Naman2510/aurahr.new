@@ -1,31 +1,32 @@
 import { NextResponse } from 'next/server';
 import { getDb, saveDb } from '@/lib/db';
 import { crossReferenceSchema } from '@/app/api/parse-jd/route';
+import { parseResumeWithTextract } from '@/lib/aws';
 
 
 // ─── Section header detection patterns ───────────────────────────────────────
 const SECTION_MAP: Record<string, RegExp> = {
-  contact:    /^(contact|personal|profile|about)\b/i,
-  education:  /^(education|academic|qualification|studies)\b/i,
+  contact: /^(contact|personal|profile|about)\b/i,
+  education: /^(education|academic|qualification|studies)\b/i,
   experience: /^(experience|employment|work|career|professional|history|positions?)\b/i,
-  skills:     /^(skills?|technical|technologies|tools?|competencies|expertise|stack)\b/i,
-  projects:   /^(projects?|portfolio|work samples?)\b/i,
+  skills: /^(skills?|technical|technologies|tools?|competencies|expertise|stack)\b/i,
+  projects: /^(projects?|portfolio|work samples?)\b/i,
 };
 
 // Expanded skill library
 const SKILL_LIBRARY = [
-  'React','Next.js','Vue','Angular','Svelte','TypeScript','JavaScript','HTML','CSS',
-  'Node.js','Express','FastAPI','Django','Flask','Spring Boot','Go','Rust','Java','Kotlin',
-  'Python','R','MATLAB','C++','C#','Swift','Flutter','PHP',
-  'AWS','GCP','Azure','Firebase','Vercel','Heroku',
-  'Docker','Kubernetes','Terraform','Ansible','CI/CD','Jenkins','GitHub Actions',
-  'PostgreSQL','MySQL','MongoDB','Redis','Kafka','RabbitMQ',
-  'GraphQL','REST','gRPC','WebSockets',
-  'Machine Learning','Deep Learning','TensorFlow','PyTorch','Scikit-learn','NLP','LLMs','MLOps',
-  'Figma','Sketch','Adobe XD','UX Research','Prototyping',
-  'VLSI','SystemVerilog','Verilog','FPGA','Cadence','Synopsys','UVM','DFT','ASIC',
-  'Embedded C','RTOS','STM32','Arduino',
-  'Git','Agile','Scrum','Jira','Confluence',
+  'React', 'Next.js', 'Vue', 'Angular', 'Svelte', 'TypeScript', 'JavaScript', 'HTML', 'CSS',
+  'Node.js', 'Express', 'FastAPI', 'Django', 'Flask', 'Spring Boot', 'Go', 'Rust', 'Java', 'Kotlin',
+  'Python', 'R', 'MATLAB', 'C++', 'C#', 'Swift', 'Flutter', 'PHP',
+  'AWS', 'GCP', 'Azure', 'Firebase', 'Vercel', 'Heroku',
+  'Docker', 'Kubernetes', 'Terraform', 'Ansible', 'CI/CD', 'Jenkins', 'GitHub Actions',
+  'PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'Kafka', 'RabbitMQ',
+  'GraphQL', 'REST', 'gRPC', 'WebSockets',
+  'Machine Learning', 'Deep Learning', 'TensorFlow', 'PyTorch', 'Scikit-learn', 'NLP', 'LLMs', 'MLOps',
+  'Figma', 'Sketch', 'Adobe XD', 'UX Research', 'Prototyping',
+  'VLSI', 'SystemVerilog', 'Verilog', 'FPGA', 'Cadence', 'Synopsys', 'UVM', 'DFT', 'ASIC',
+  'Embedded C', 'RTOS', 'STM32', 'Arduino',
+  'Git', 'Agile', 'Scrum', 'Jira', 'Confluence',
 ];
 
 // ─── Layout-aware section block splitter ─────────────────────────────────────
@@ -77,12 +78,12 @@ function calcProfileStrength(data: {
   degree: string | null; institute: string | null;
 }): { score: number; breakdown: Record<string, number>; tier: string } {
   const b = {
-    identity:   data.name && data.name !== 'Resume Upload' ? 10 : 0,
-    contact:    (data.email ? 15 : 0) + (data.phone ? 10 : 0),
+    identity: data.name && data.name !== 'Resume Upload' ? 10 : 0,
+    contact: (data.email ? 15 : 0) + (data.phone ? 10 : 0),
     experience: data.totalExpYears != null ? Math.min(25, data.totalExpYears * 3) : 5,
-    skills:     Math.min(25, data.allSkills.length * 3),
+    skills: Math.min(25, data.allSkills.length * 3),
     workProven: Math.min(10, data.workSkills.length * 2), // extra weight for work-context skills
-    education:  data.degree ? 5 : 0,
+    education: data.degree ? 5 : 0,
   };
   const score = Math.min(100, Object.values(b).reduce((a, x) => a + x, 0));
   const tier = score >= 80 ? 'Strong' : score >= 60 ? 'Good' : score >= 40 ? 'Fair' : 'Incomplete';
@@ -93,7 +94,22 @@ function calcProfileStrength(data: {
 // ─── Main handler ─────────────────────────────────────────────────────────────
 export async function POST(req: Request) {
   try {
-    const { text, filename } = await req.json();
+    let text = '';
+    let filename = 'Resume';
+
+    const contentType = req.headers.get('content-type') || '';
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      const file = formData.get('file') as File;
+      if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+      filename = file.name;
+      const buffer = Buffer.from(await file.arrayBuffer());
+      text = await parseResumeWithTextract(buffer);
+    } else {
+      const body = await req.json();
+      text = body.text;
+      filename = body.filename || 'Resume';
+    }
 
     if (!text || text.trim().length < 5) {
       return NextResponse.json({ error: 'No readable content provided.', status: 'failed' }, { status: 400 });
@@ -128,7 +144,7 @@ export async function POST(req: Request) {
       institute: instituteMatch?.[0]?.trim() || null,
       tier: instituteMatch?.[0]?.match(/IIT|IISc|BITS\s*Pilani|NID|XLRI/i)
         ? 'Tier 1 (Premium)' : instituteMatch?.[0]?.match(/NIT|VIT|Manipal|Amity/i)
-        ? 'Tier 2 (Reputed)' : education_tier_fallback(blocks.education)
+          ? 'Tier 2 (Reputed)' : education_tier_fallback(blocks.education)
     };
 
     function education_tier_fallback(eduText: string): string {

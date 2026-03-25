@@ -5,7 +5,7 @@ import {
   Loader2, Clock, TrendingUp, Star, Phone, GraduationCap, Building2,
   CalendarCheck, ChevronRight, Zap, Upload, AlertCircle, FileText,
   ArrowRight, Sparkles, Archive, ChevronDown, ShieldCheck, XCircle,
-  LayoutGrid, Link2
+  LayoutGrid, Link2, Mic, MicOff
 } from 'lucide-react';
 import Papa from 'papaparse';
 import { DigitalFootprintMiner } from '@/components/experiments/DigitalFootprintMiner';
@@ -13,6 +13,8 @@ import { MarketTrendEvolution } from '@/components/experiments/MarketTrendEvolut
 import { TeamCollaborationGraph } from '@/components/experiments/TeamCollaborationGraph';
 import RadarChart from '@/components/RadarChart';
 import { motion } from 'framer-motion';
+import JDAnalysisFourBox from '@/components/features/CandidateSuite/JDAnalysisFourBox';
+import JitsiRoom from '@/components/features/Proctoring/JitsiRoom';
 
 type Candidate = {
   id: string; name: string; role: string; status: string;
@@ -21,6 +23,9 @@ type Candidate = {
   aiInterviewScore?: number; salaryExpectation?: number;
   source?: string; gender?: string; profileStrength?: number;
   jdMatchRank?: string; matchedMust?: string[]; missingMust?: string[];
+  recruiterRating?: number;
+  recruiterFeedback?: string;
+  aiSummary?: string;
 };
 
 const scoreBadge = (pct: number) =>
@@ -35,7 +40,7 @@ type Matrix = {
 };
 type ChatMessage = { role: 'ai' | 'user'; content: string; matrix?: Matrix };
 
-const TABS = ['Pipeline', 'Smart Match', 'AI Interview', 'Analytics'] as const;
+const TABS = ['Pipeline', 'Smart Match', 'AI Interview', 'Analytics', 'Final Ranking'] as const;
 type Tab = typeof TABS[number];
 const PIPELINE_STAGES = ['Applied', 'Screened', 'Interview', 'Offer', 'Rejected'];
 
@@ -95,9 +100,48 @@ export default function RecruitmentDashboard() {
   const [smartMatchData, setSmartMatchData] = useState<any>(null);
   const [smartMatchLoading, setSmartMatchLoading] = useState(false);
   // Stage transition
+  const [isInviting, setIsInviting] = useState<string | null>(null);
   const [stageChanging, setStageChanging] = useState<string | null>(null);
   const [showStageDropdown, setShowStageDropdown] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [feedback, setFeedback] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // ─── SPEECH TO TEXT (STT) ──────────────────────────────────────────────────
+  const startListening = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Speech Recognition not supported in this browser.');
+      return;
+    }
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-IN'; // Optimized for Indian English
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setUserInput(prev => prev ? `${prev} ${transcript}` : transcript);
+    };
+    recognition.onerror = (event: any) => {
+      console.error('STT Error:', event.error);
+      setIsListening(false);
+    };
+    recognition.start();
+  };
+
+  const speak = (text: string) => {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel(); // Stop any pending speech
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-IN';
+    utterance.rate = 1.0;
+    window.speechSynthesis.speak(utterance);
+  };
 
   const fetchCandidates = async () => {
     const res = await fetch('/api/candidates');
@@ -168,10 +212,15 @@ export default function RecruitmentDashboard() {
       await new Promise(r => setTimeout(r, OCR_STAGES[i].duration));
     }
     try {
-      const text = await file.text().catch(() =>
-        `React Node.js TypeScript 5 years experience B.Tech IIT Bombay email: resume@example.com phone: 9820134567`
-      );
-      const res = await fetch('/api/resume/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, filename: file.name }) });
+      // 1. Upload to S3 for storage
+      const s3FormData = new FormData();
+      s3FormData.append('file', file);
+      await fetch('/api/storage/upload', { method: 'POST', body: s3FormData });
+
+      // 2. Clear simulated delay and call Textract OCR backend
+      const parseFormData = new FormData();
+      parseFormData.append('file', file);
+      const res = await fetch('/api/resume/parse', { method: 'POST', body: parseFormData });
       const data = await res.json();
       setPdfExtracted(data);
     } finally { setOcrStage(3); }
@@ -189,6 +238,19 @@ export default function RecruitmentDashboard() {
     }});
   };
 
+  const handleInvite = async (candidate: Candidate) => {
+    setIsInviting(candidate.id);
+    try {
+      const res = await fetch('/api/comms/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: `${candidate.name.toLowerCase().replace(/\s+/g, '.')}@example.com`, name: candidate.name, role: candidate.role })
+      });
+      const data = await res.json();
+      if (data.success) alert(`Invite sent via SES! Jitsi Link: ${data.jitsiLink}`);
+    } finally { setIsInviting(null); }
+  };
+
   const advanceStage = async (candidateId: string, newStage: string) => {
     setStageChanging(candidateId);
     try {
@@ -197,6 +259,32 @@ export default function RecruitmentDashboard() {
       if (selectedCandidate?.id === candidateId) setSelectedCandidate(c => c ? { ...c, status: newStage } : null);
     } finally { setStageChanging(null); setShowStageDropdown(false); }
   };
+
+  const handleSaveRating = async () => {
+    if (!interviewCandidate) return;
+    try {
+      await fetch(`/api/candidates/${interviewCandidate.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recruiterRating: rating, recruiterFeedback: feedback, status: 'Screened' })
+      });
+      alert('Rating saved successfully!');
+      setShowReport(false);
+      setInterviewCandidate(null);
+      await fetchCandidates();
+    } catch (e) { console.error(e); }
+  };
+
+  const getFinalScore = (c: Candidate) => {
+    const jd = c.matchPercent || 0;
+    const ai = c.aiInterviewScore || 0;
+    const recruiter = ((c.recruiterRating || 0) / 5) * 100;
+    
+    // Balanced weighted score
+    return Math.round((jd * 0.3) + (ai * 0.4) + (recruiter * 0.3));
+  };
+
+  const sortedRanking = [...candidates].sort((a, b) => getFinalScore(b) - getFinalScore(a));
 
   const sortedLeaderboard = [...candidates].sort((a, b) =>
     ((b.matchPercent || 0) + (b.aiInterviewScore || 0)) / 2 - ((a.matchPercent || 0) + (a.aiInterviewScore || 0)) / 2
@@ -280,80 +368,10 @@ export default function RecruitmentDashboard() {
                       </div>
                     </div>
 
-                    {/* ── Detected Skills Matrix ── */}
-                    <div className="space-y-3">
-
-                      {/* Must-Haves — Solid Indigo Badges */}
-                      <div className="bg-indigo-950/30 border border-indigo-500/20 rounded-xl p-4">
-                        <div className="text-[10px] font-mono text-indigo-300 uppercase tracking-wider mb-3 font-bold flex items-center space-x-1">
-                          <CheckCircle className="w-3 h-3" />
-                          <span>Must-Have Skills</span>
-                          <span className="ml-auto text-indigo-400/50">{editMust.length} required</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5 mb-2">
-                          {editMust.map((s: string) => (
-                            <span key={s} className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white text-[10px] rounded-lg font-mono font-bold shadow-sm">
-                              {s}
-                              <button onClick={() => setEditMust(p => p.filter(x => x !== s))} className="hover:text-red-300 transition-colors ml-0.5">×</button>
-                            </span>
-                          ))}
-                          {!editMust.length && <span className="text-[10px] text-white/25 italic">No must-haves detected — try a more detailed JD</span>}
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
-                          <input value={newSkillInput.must} onChange={e => setNewSkillInput(p => ({...p, must: e.target.value}))}
-                            onKeyDown={e => { if (e.key === 'Enter' && newSkillInput.must.trim()) { setEditMust(p => [...p, newSkillInput.must.trim()]); setNewSkillInput(p => ({...p, must: ''})); }}}
-                            placeholder="+ Add must-have…" className="flex-1 bg-white/5 border border-indigo-500/20 rounded-lg px-3 py-1 text-[10px] font-mono text-white placeholder:text-white/20 focus:outline-none focus:border-indigo-400/50" />
-                        </div>
-                        {parsedJD.expRequired && <div className="mt-2 text-[9px] text-indigo-400/70 font-mono bg-indigo-950/40 rounded px-2 py-1">⏱ {parsedJD.expRequired}</div>}
-                      </div>
-
-                      {/* Nice-to-Haves — Outlined Blue Badges */}
-                      <div className="bg-blue-950/20 border border-blue-500/15 rounded-xl p-4">
-                        <div className="text-[10px] font-mono text-blue-300/80 uppercase tracking-wider mb-3 font-bold flex items-center space-x-1">
-                          <Star className="w-3 h-3" />
-                          <span>Nice-to-Have Skills</span>
-                          <span className="ml-auto text-blue-400/40">{editNice.length} preferred</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5 mb-2">
-                          {editNice.map((s: string) => (
-                            <span key={s} className="inline-flex items-center gap-1 px-2.5 py-1 bg-transparent border border-blue-500/40 text-blue-300 text-[10px] rounded-lg font-mono">
-                              {s}
-                              <button onClick={() => setEditNice(p => p.filter(x => x !== s))} className="hover:text-red-300 transition-colors ml-0.5">×</button>
-                            </span>
-                          ))}
-                          {!editNice.length && <span className="text-[10px] text-white/25 italic">None detected</span>}
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
-                          <input value={newSkillInput.nice} onChange={e => setNewSkillInput(p => ({...p, nice: e.target.value}))}
-                            onKeyDown={e => { if (e.key === 'Enter' && newSkillInput.nice.trim()) { setEditNice(p => [...p, newSkillInput.nice.trim()]); setNewSkillInput(p => ({...p, nice: ''})); }}}
-                            placeholder="+ Add nice-to-have…" className="flex-1 bg-white/5 border border-blue-500/15 rounded-lg px-3 py-1 text-[10px] font-mono text-white placeholder:text-white/20 focus:outline-none focus:border-blue-400/40" />
-                        </div>
-                      </div>
-
-                      {/* Soft Skills — Grey Badges */}
-                      {(editSoft.length > 0 || true) && (
-                        <div className="bg-white/3 border border-white/8 rounded-xl p-4">
-                          <div className="text-[10px] font-mono text-white/50 uppercase tracking-wider mb-3 font-bold flex items-center space-x-1">
-                            <Users className="w-3 h-3" />
-                            <span>Soft Skills</span>
-                            <span className="ml-auto text-white/25">{editSoft.length} detected</span>
-                          </div>
-                          <div className="flex flex-wrap gap-1.5 mb-2">
-                            {editSoft.map((s: string) => (
-                              <span key={s} className="inline-flex items-center gap-1 px-2.5 py-1 bg-white/8 text-white/50 text-[10px] rounded-lg font-mono border border-white/10">
-                                {s}
-                                <button onClick={() => setEditSoft(p => p.filter(x => x !== s))} className="hover:text-red-300 transition-colors ml-0.5">×</button>
-                              </span>
-                            ))}
-                            {!editSoft.length && <span className="text-[10px] text-white/20 italic">None detected</span>}
-                          </div>
-                          <div className="flex items-center gap-2 mt-2">
-                            <input value={newSkillInput.soft} onChange={e => setNewSkillInput(p => ({...p, soft: e.target.value}))}
-                              onKeyDown={e => { if (e.key === 'Enter' && newSkillInput.soft.trim()) { setEditSoft(p => [...p, newSkillInput.soft.trim()]); setNewSkillInput(p => ({...p, soft: ''})); }}}
-                              placeholder="+ Add soft skill…" className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-[10px] font-mono text-white placeholder:text-white/20 focus:outline-none focus:border-white/20" />
-                          </div>
-                        </div>
-                      )}
+                    {/* ── 4-Box AI Insight Matrix ── */}
+                    <div className="pt-4 border-t border-white/10">
+                       <JDAnalysisFourBox />
+                    </div>
 
                       {/* Skill Gaps Alert */}
                       {(parsedJD.gaps || []).length > 0 && (
@@ -369,7 +387,7 @@ export default function RecruitmentDashboard() {
                           </div>
                         </div>
                       )}
-                    </div>
+
 
                     {/* Recommended Existing Talent */}
                     {parsedJD.recommendedTalent?.length > 0 && (
@@ -424,7 +442,6 @@ export default function RecruitmentDashboard() {
                         </div>
                       </div>
                     </motion.div>
-
                   </div>
                 )}
               </div>
@@ -712,11 +729,16 @@ export default function RecruitmentDashboard() {
                     <button onClick={() => advanceStage(interviewCandidate.id, 'Offer')} className="flex items-center space-x-1.5 bg-sage/20 hover:bg-sage/30 text-sage border border-sage/20 px-3 py-2 rounded-xl text-xs font-bold transition-all">
                       <ArrowRight className="w-3.5 h-3.5" /><span>Promote</span>
                     </button>
-                    <button onClick={() => advanceStage(interviewCandidate.id, 'Rejected')} className="flex items-center space-x-1.5 bg-rust/10 hover:bg-rust/20 text-rust border border-rust/20 px-3 py-2 rounded-xl text-xs font-bold transition-all">
-                      <Archive className="w-3.5 h-3.5" /><span>Archive</span>
-                    </button>
                     <button onClick={() => setInterviewCandidate(null)} className="text-white/30 hover:text-white p-2 rounded-lg hover:bg-white/5"><X className="w-5 h-5" /></button>
                   </div>
+                </div>
+                
+                {/* ── JITSI PROCTORING VIEW ── */}
+                <div className="h-[400px] mb-6">
+                  <JitsiRoom 
+                    roomName={`AuraHR-PROCTOR-${interviewCandidate.id}`} 
+                    userName={`Recruiter (Monitoring ${interviewCandidate.name})`} 
+                  />
                 </div>
                 <div className="flex-1 overflow-y-auto space-y-4 pr-2 mb-4">
                   {chatMessages.map((msg, i) => (
@@ -759,12 +781,20 @@ export default function RecruitmentDashboard() {
                   <div ref={chatEndRef} />
                 </div>
                 <div className="flex space-x-3">
+                  <button onClick={startListening} disabled={isAiThinking}
+                    className={`px-4 rounded-xl transition-all border ${isListening ? 'bg-gold/20 border-gold text-gold animate-pulse' : 'bg-white/5 border-white/10 text-white/40 hover:text-gold hover:border-gold/40'}`}>
+                    {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                  </button>
                   <input value={userInput} onChange={e => setUserInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMessage()}
-                    placeholder="Type candidate's response here…"
+                    placeholder="Type or speak candidate's response…"
                     className="flex-1 bg-white/5 border border-white/10 rounded-xl px-5 py-3.5 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-gold/40 transition-all" />
                   <button onClick={sendMessage} disabled={!userInput.trim() || isAiThinking}
                     className="bg-gold text-ink px-5 rounded-xl hover:bg-gold/90 disabled:opacity-40 shadow-[0_0_15px_rgba(200,168,75,0.3)]">
                     <Send className="w-5 h-5" />
+                  </button>
+                  <button onClick={() => setShowReport(true)}
+                    className="border border-gold text-gold px-4 py-2 rounded-xl text-xs font-bold hover:bg-gold/10 transition-all flex items-center">
+                    <Trophy className="w-3.5 h-3.5 mr-2" />Finalize
                   </button>
                 </div>
               </div>
@@ -778,8 +808,14 @@ export default function RecruitmentDashboard() {
             
             {/* NEEV CLOUD ANALYTICS MODULES (Features Injected) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 mt-2">
-              <div className="lg:col-span-1 rounded-2xl overflow-hidden bg-cream shadow-sm flex flex-col justify-center">
+              <div className="lg:col-span-1">
                 <DigitalFootprintMiner />
+              </div>
+              <div className="lg:col-span-1">
+                <MarketTrendEvolution />
+              </div>
+              <div className="lg:col-span-2">
+                <TeamCollaborationGraph />
               </div>
             </div>
 
@@ -832,6 +868,55 @@ export default function RecruitmentDashboard() {
             </div>
           </div>
         )}
+
+        {/* ══════════════════ FINAL RANKING TAB ══════════════════ */}
+        {activeTab === 'Final Ranking' && (
+          <div className="space-y-8">
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-8 mb-8 relative overflow-hidden">
+               <div className="absolute top-0 right-0 p-8 opacity-10"><Trophy className="w-32 h-32 text-gold" /></div>
+               <h3 className="font-serif text-3xl text-white mb-2">Talent Leaderboard</h3>
+               <p className="text-white/40 text-sm font-mono uppercase tracking-widest">Weighted Synthesis of Match, AI Interview & Recruiter Rating</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-4">
+                {sortedRanking.map((c, i) => (
+                  <div key={c.id} className="bg-white/5 border border-white/10 rounded-2xl p-6 flex items-center justify-between hover:border-gold/30 transition-all group cursor-pointer" onClick={() => setSelectedCandidate(c)}>
+                    <div className="flex items-center space-x-5">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center font-serif font-bold text-xl ${i === 0 ? 'bg-gold/20 text-gold border border-gold/40 shadow-[0_0_15px_rgba(200,168,75,0.2)]' : 'bg-white/10 text-white/60 border border-white/10'}`}>
+                        {i + 1}
+                      </div>
+                      <div>
+                        <h4 className="font-serif text-lg text-white group-hover:text-gold transition-colors">{c.name}</h4>
+                        <p className="text-xs text-white/40 font-mono">{c.role}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-8">
+                       <div className="text-center">
+                          <div className="text-[10px] font-mono text-white/30 uppercase mb-1">Score</div>
+                          <div className="text-2xl font-serif text-gold">{getFinalScore(c)}</div>
+                       </div>
+                       <ChevronRight className="w-5 h-5 text-white/20 group-hover:text-gold transition-all" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="lg:col-span-1 space-y-6">
+                 <div className="bg-gold/5 border border-gold/10 rounded-2xl p-6">
+                    <h4 className="text-xs font-mono font-bold text-gold uppercase tracking-widest mb-6">Top Performer Intelligence</h4>
+                    {sortedRanking[0] && (
+                      <div className="space-y-6">
+                        <DigitalFootprintMiner candidateName={sortedRanking[0].name} role={sortedRanking[0].role} />
+                        <TeamCollaborationGraph scores={sortedRanking[0].score} />
+                      </div>
+                    )}
+                 </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ══════════════════ CANDIDATE DETAIL MODAL ══════════════════ */}
@@ -840,22 +925,22 @@ export default function RecruitmentDashboard() {
           <div className="bg-[#111009] border border-white/10 w-full max-w-4xl rounded-3xl overflow-hidden max-h-[90vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-white/5 flex justify-between items-center">
               <div className="flex items-center space-x-4">
-                <div className="w-14 h-14 rounded-full bg-gold/10 border border-gold/20 flex items-center justify-center font-serif font-bold text-gold text-2xl">{selectedCandidate.name.charAt(0)}</div>
-                <div>
-                  <h3 className="font-serif text-2xl text-white">{selectedCandidate.name}</h3>
-                  <p className="text-xs text-white/40 font-mono">{selectedCandidate.role} · {selectedCandidate.phone}</p>
+                <div className="w-14 h-14 rounded-full bg-gold/10 border border-gold/20 flex items-center justify-center font-serif font-bold text-gold text-2xl">{(selectedCandidate as any).name.charAt(0)}</div>
+                  <div>
+                    <h3 className="font-serif text-2xl text-white">{(selectedCandidate as any).name}</h3>
+                    <p className="text-xs text-white/40 font-mono">{(selectedCandidate as any).role} · {(selectedCandidate as any).phone}</p>
+                  </div>
                 </div>
-              </div>
               <div className="flex items-center space-x-3">
                 <div className="relative" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => setShowStageDropdown(p => !p)}
+                  <button onClick={() => setShowStageDropdown((p: boolean) => !p)}
                     className="flex items-center space-x-2 bg-gold text-ink px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-gold/90 transition-all">
-                    {stageChanging === selectedCandidate.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ArrowRight className="w-4 h-4" /><span>Move to Stage</span><ChevronDown className="w-4 h-4" /></>}
+                    {stageChanging === (selectedCandidate as any).id ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ArrowRight className="w-4 h-4" /><span>Move to Stage</span><ChevronDown className="w-4 h-4" /></>}
                   </button>
                   {showStageDropdown && (
                     <div className="absolute right-0 top-full mt-2 w-52 bg-[#1a1814] border border-white/15 rounded-2xl shadow-2xl overflow-hidden z-10 animate-in slide-in-from-top-2">
-                      {PIPELINE_STAGES.filter(s => s !== selectedCandidate.status).map(stage => (
-                        <button key={stage} onClick={() => advanceStage(selectedCandidate.id, stage)}
+                      {PIPELINE_STAGES.filter(s => s !== (selectedCandidate as any).status).map(stage => (
+                        <button key={stage} onClick={() => advanceStage((selectedCandidate as any).id, stage)}
                           className="w-full text-left px-5 py-3 text-sm text-white/70 hover:bg-gold/10 hover:text-gold transition-colors font-medium">
                           → {stage}
                         </button>
@@ -871,31 +956,31 @@ export default function RecruitmentDashboard() {
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-white/5 rounded-xl p-4 border border-white/5">
                     <div className="text-[10px] font-mono text-white/40 mb-1">JD Match</div>
-                    <div className="font-serif text-4xl text-gold">{selectedCandidate.matchPercent}%</div>
+                    <div className="font-serif text-4xl text-gold">{(selectedCandidate as any).matchPercent}%</div>
                   </div>
                   <div className="bg-white/5 rounded-xl p-4 border border-white/5">
                     <div className="text-[10px] font-mono text-white/40 mb-1">AI Score</div>
-                    <div className="font-serif text-4xl text-sage">{selectedCandidate.aiInterviewScore || '—'}</div>
+                    <div className="font-serif text-4xl text-sage">{(selectedCandidate as any).aiInterviewScore || '—'}</div>
                   </div>
                   <div className="bg-white/5 rounded-xl p-4 border border-white/5">
                     <div className="text-[10px] font-mono text-white/40 mb-1">Origin</div>
-                    <span className={`text-[10px] px-2 py-1 rounded border font-mono ${getSourceColor(selectedCandidate.source)}`}>{selectedCandidate.source || 'Manual'}</span>
+                    <span className={`text-[10px] px-2 py-1 rounded border font-mono ${getSourceColor((selectedCandidate as any).source)}`}>{(selectedCandidate as any).source || 'Manual'}</span>
                   </div>
                 </div>
                 <div>
                   <div className="text-xs font-mono font-bold text-white/40 uppercase tracking-wider mb-2">Education</div>
-                  <div className="flex items-center space-x-2 text-white mb-1"><GraduationCap className="w-4 h-4 text-gold" /><span>{selectedCandidate.education || '—'}</span></div>
-                  <div className="flex items-center space-x-2 text-white/50"><Building2 className="w-4 h-4" /><span className="text-sm">{selectedCandidate.institute || '—'}</span></div>
+                  <div className="flex items-center space-x-2 text-white mb-1"><GraduationCap className="w-4 h-4 text-gold" /><span>{(selectedCandidate as any).education || '—'}</span></div>
+                  <div className="flex items-center space-x-2 text-white/50"><Building2 className="w-4 h-4" /><span className="text-sm">{(selectedCandidate as any).institute || '—'}</span></div>
                 </div>
                 <div>
                   <div className="text-xs font-mono font-bold text-white/40 uppercase tracking-wider mb-2">Matched Skills</div>
-                  <div className="flex flex-wrap gap-2">{selectedCandidate.matchTags.map(t => <span key={t} className="px-3 py-1.5 bg-gold/10 text-gold border border-gold/20 text-xs rounded-lg font-mono flex items-center"><CheckCircle className="w-3 h-3 mr-1.5" />{t}</span>)}</div>
+                  <div className="flex flex-wrap gap-2">{(selectedCandidate as any).matchTags.map((t: string) => <span key={t} className="px-3 py-1.5 bg-gold/10 text-gold border border-gold/20 text-xs rounded-lg font-mono flex items-center"><CheckCircle className="w-3 h-3 mr-1.5" />{t}</span>)}</div>
                 </div>
-                {selectedCandidate.salaryExpectation && (
+                {(selectedCandidate as any).salaryExpectation && (
                   <div className="bg-white/5 rounded-xl p-4 border border-white/5">
                     <div className="text-xs font-mono text-white/40 mb-1">Expected CTC</div>
-                    <div className="font-serif text-2xl text-white">{formatLPA(selectedCandidate.salaryExpectation)}</div>
-                    <div className="text-[10px] text-white/30 mt-0.5">{formatINR(selectedCandidate.salaryExpectation)} per annum</div>
+                    <div className="font-serif text-2xl text-white">{formatLPA((selectedCandidate as any).salaryExpectation)}</div>
+                    <div className="text-[10px] text-white/30 mt-0.5">{formatINR((selectedCandidate as any).salaryExpectation)} per annum</div>
                   </div>
                 )}
                 <div className="flex space-x-3 pt-2">
@@ -903,16 +988,59 @@ export default function RecruitmentDashboard() {
                     className="flex-1 bg-gold text-ink py-3 rounded-xl font-bold text-sm hover:bg-gold/90 flex items-center justify-center">
                     <Brain className="w-4 h-4 mr-2" />Start AI Interview
                   </button>
-                  <button className="flex-1 border border-white/10 py-3 rounded-xl font-bold text-sm text-white/50 hover:text-white hover:border-white/20 flex items-center justify-center">
-                    <CalendarCheck className="w-4 h-4 mr-2" />Schedule (IST)
+                  <button onClick={() => handleInvite(selectedCandidate as any)} disabled={!!isInviting}
+                    className="flex-1 border border-white/10 py-3 rounded-xl font-bold text-sm text-white/50 hover:text-white hover:border-white/20 flex items-center justify-center disabled:opacity-50">
+                    {isInviting === (selectedCandidate as any).id ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2 text-gold/60" />}
+                    Send AI Invite (SES)
                   </button>
                 </div>
               </div>
               <div className="w-64 bg-white/3 rounded-2xl border border-white/5 p-5 flex flex-col items-center flex-shrink-0">
                 <div className="text-xs font-mono text-white/40 uppercase tracking-wider mb-4 self-start">5-Axis Radar</div>
                 <div className="w-full flex-1 flex items-center justify-center">
-                  <RadarChart data={selectedCandidate.score} />
+                  <RadarChart data={(selectedCandidate as any).score} />
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ══════════════════ POST-INTERVIEW RATING MODAL ══════════════════ */}
+      {showReport && interviewCandidate && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/80 backdrop-blur-xl">
+          <div className="bg-[#111009] border border-white/10 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl p-8 relative">
+            <button onClick={() => setShowReport(false)} className="absolute top-6 right-6 text-white/30 hover:text-white p-2 rounded-lg hover:bg-white/5"><X className="w-5 h-5" /></button>
+            
+            <h3 className="font-serif text-3xl text-white mb-2">Finalize Evaluation</h3>
+            <p className="text-white/40 text-sm mb-8 font-mono">Candidate: <span className="text-gold">{interviewCandidate.name}</span></p>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="text-[10px] font-mono font-bold text-white/40 uppercase tracking-widest block mb-4">Recruiter Rating</label>
+                <div className="flex space-x-3">
+                  {[1, 2, 3, 4, 5].map(s => (
+                    <button key={s} onClick={() => setRating(s)} className={`p-3 rounded-xl border transition-all ${rating >= s ? 'bg-gold/20 border-gold/50 text-gold shadow-[0_0_15px_rgba(200,168,75,0.2)]' : 'bg-white/5 border-white/5 text-white/20 hover:border-white/20'}`}>
+                      <Star className={`w-7 h-7 ${rating >= s ? 'fill-current' : ''}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-mono font-bold text-white/40 uppercase tracking-widest block mb-3">Interview Summary & Notes</label>
+                <textarea 
+                  value={feedback} 
+                  onChange={e => setFeedback(e.target.value)}
+                  placeholder="Summarize your overall impression of the candidate's performance, cultural fit, and potential for the team..."
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm text-white placeholder:text-white/20 min-h-[120px] focus:outline-none focus:border-gold/40 transition-all"
+                />
+              </div>
+
+              <div className="pt-4 flex space-x-3">
+                <button onClick={handleSaveRating} className="flex-1 bg-gold text-ink font-bold py-4 rounded-2xl hover:bg-gold/90 transition-all flex items-center justify-center shadow-lg">
+                  <CheckCircle className="w-5 h-5 mr-3" />Save & Complete Interview
+                </button>
+                <button onClick={() => setShowReport(false)} className="px-6 border border-white/10 text-white/50 rounded-2xl hover:text-white hover:border-white/20 transition-all">Cancel</button>
               </div>
             </div>
           </div>

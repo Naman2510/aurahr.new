@@ -4,13 +4,28 @@ import { motion } from "framer-motion";
 import { TrendingUp } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
-export function MarketTrendEvolution() {
-  const data = [
+export function MarketTrendEvolution({ role }: { role?: string }) {
+  const isFrontend = role?.toLowerCase().includes('front') || role?.toLowerCase().includes('react');
+  const isData = role?.toLowerCase().includes('data') || role?.toLowerCase().includes('python');
+
+  const data = isFrontend ? [
     { name: 'React', candidate: 92, demand2026: 95 },
-    { name: 'Node.js', candidate: 85, demand2026: 80 },
-    { name: 'Python', candidate: 70, demand2026: 98 },
-    { name: 'Next.js', candidate: 90, demand2026: 92 },
-    { name: 'Docker', candidate: 65, demand2026: 88 }
+    { name: 'TypeScript', candidate: 88, demand2026: 98 },
+    { name: 'Next.js', candidate: 85, demand2026: 92 },
+    { name: 'Tailwind', candidate: 95, demand2026: 85 },
+    { name: 'Web3', candidate: 40, demand2026: 80 }
+  ] : isData ? [
+    { name: 'Python', candidate: 95, demand2026: 98 },
+    { name: 'PyTorch', candidate: 80, demand2026: 95 },
+    { name: 'SQL', candidate: 90, demand2026: 85 },
+    { name: 'Pandas', candidate: 85, demand2026: 80 },
+    { name: 'MLOps', candidate: 50, demand2026: 90 }
+  ] : [
+    { name: 'Node.js', candidate: 85, demand2026: 90 },
+    { name: 'Go', candidate: 60, demand2026: 95 },
+    { name: 'Docker', candidate: 75, demand2026: 88 },
+    { name: 'AWS', candidate: 80, demand2026: 92 },
+    { name: 'Kubernetes', candidate: 55, demand2026: 96 }
   ];
 
   return (

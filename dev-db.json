@@ -166,7 +166,14 @@
         "adaptability": 90
       },
       "interviewLogs": [],
-      "assessments": []
+      "assessments": [],
+      "stageHistory": [
+        {
+          "from": "Offer",
+          "to": "Offer",
+          "timestamp": "2026-03-25T23:04:56.626Z"
+        }
+      ]
     },
     {
       "id": "c2",
@@ -969,12 +976,24 @@
   ],
   "jobDescriptions": [
     {
+      "id": "parsed_jd",
+      "title": "Full Stack Developer",
+      "department": "Active",
+      "salaryBudget": 0,
+      "active": true,
+      "mustHave": [
+        "Python"
+      ],
+      "niceToHave": [],
+      "createdAt": "2026-03-25T23:02:17.124Z"
+    },
+    {
       "id": "jd1",
       "title": "Senior Full Stack Engineer",
       "department": "Engineering",
       "salaryBudget": 2800000,
       "active": true,
-      "createdAt": "2026-03-25T21:47:00.496Z",
+      "createdAt": "2026-03-25T23:01:31.876Z",
       "mustHave": [
         "React",
         "Node.js",
@@ -995,7 +1014,7 @@
       "department": "AI Research",
       "salaryBudget": 3200000,
       "active": true,
-      "createdAt": "2026-03-25T21:47:00.496Z",
+      "createdAt": "2026-03-25T23:01:31.877Z",
       "mustHave": [
         "Python",
         "Machine Learning",

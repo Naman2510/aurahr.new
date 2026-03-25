@@ -11,30 +11,26 @@ import FutureProofScore from "./FutureProofScore";
 import SynergyGraph from "./SynergyGraph";
 import ProctorView from "./ProctorView";
 import SiteDiagnostics from "./SiteDiagnostics";
+import RecruitmentPipeline from "./RecruitmentPipeline";
+import TeamGapAnalysis from "./TeamGapAnalysis";
 
 export default function FeatureDashboard() {
   const [connectBackend, setConnectBackend] = useState(false);
 
   return (
-    <div className="py-16 px-6 relative w-full bg-slate-950 font-sans text-slate-200 border-t border-slate-800">
+    <div className="py-8 px-2 relative w-full bg-transparent font-sans text-ink">
       
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-0 right-[20%] w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 left-[10%] w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-[100px]" />
-      </div>
-
       <div className="max-w-7xl mx-auto relative z-10">
         
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 px-6">
           <div>
-            <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-white flex items-center gap-3">
-              <Sparkles className="text-indigo-400 w-8 h-8" />
-              AI Talent Suite
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-ink flex items-center gap-3 font-serif">
+              <Sparkles className="text-gold w-8 h-8" />
+              Recruitment Intelligence
             </h2>
-            <p className="mt-4 text-slate-400 max-w-2xl text-lg">
-              Unlock our next-generation candidate evaluation workflows. Monitor system health, predict market trajectories, and verify profiles in real-time.
+            <p className="mt-4 text-ink/60 max-w-2xl text-lg">
+              Monitor candidate pipelines, analyze team skill gaps, and verify interview integrity with real-time AI telemetry.
             </p>
           </div>
 
@@ -43,8 +39,8 @@ export default function FeatureDashboard() {
             <button 
               onClick={() => setConnectBackend(!connectBackend)}
               className={clsx(
-                "relative inline-flex h-8 w-16 items-center rounded-full transition-colors focus:outline-none ring-2 ring-offset-2 ring-offset-slate-950 ring-transparent",
-                connectBackend ? "bg-indigo-500" : "bg-slate-700"
+                "relative inline-flex h-8 w-16 items-center rounded-full transition-colors focus:outline-none ring-2 ring-offset-2 ring-offset-warm-sand ring-transparent",
+                connectBackend ? "bg-sage" : "bg-ink/10"
               )}
             >
               <span className={clsx(
@@ -52,16 +48,16 @@ export default function FeatureDashboard() {
                 connectBackend ? "translate-x-9" : "translate-x-1"
               )} />
             </button>
-            <div className="mt-3 flex items-center space-x-2 text-xs font-mono tracking-wider uppercase">
+            <div className="mt-3 flex items-center space-x-2 text-[10px] font-mono tracking-wider uppercase">
               {connectBackend ? (
                 <>
-                  <RefreshCcw className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
-                  <span className="text-indigo-300">Awaiting API Connection</span>
+                  <RefreshCcw className="w-3.5 h-3.5 text-sage animate-spin" />
+                  <span className="text-sage">Production: Dedicated Tunnel</span>
                 </>
               ) : (
                 <>
-                  <WifiOff className="w-3.5 h-3.5 text-slate-500" />
-                  <span className="text-slate-400">Demo Mode: Static Data</span>
+                  <WifiOff className="w-3.5 h-3.5 text-ink/40" />
+                  <span className="text-ink/40">Demo Mode: Edge Cache</span>
                 </>
               )}
             </div>
@@ -69,30 +65,36 @@ export default function FeatureDashboard() {
         </div>
 
         {/* Bento Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-[340px]">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-min md:auto-rows-[400px]">
           
-          <div className="lg:col-span-2">
-            <FootprintMiner />
+          {/* Main Pipeline - Largest Card */}
+          <div className="lg:col-span-2 lg:row-span-2 bg-cream border border-ink/10 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+            <RecruitmentPipeline />
+          </div>
+
+          {/* Team Gap Analysis */}
+          <div className="lg:col-span-1 lg:row-span-1 bg-white border border-ink/10 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+            <TeamGapAnalysis />
           </div>
           
-          <div>
+          {/* Smart Scheduler */}
+          <div className="lg:col-span-1 lg:row-span-1 bg-cream/50 border border-ink/10 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
             <SmartScheduler />
           </div>
           
-          <div>
-            <SiteDiagnostics />
-          </div>
-          
-          <div className="lg:col-span-2">
+          {/* Feature: Integrity Timeline (Proctoring) */}
+          <div className="lg:col-span-2 lg:row-span-1 bg-ink text-warm-sand rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
             <ProctorView />
           </div>
 
-          <div className="lg:col-span-2">
-            <FutureProofScore />
+          {/* Site Health & Diagnostics */}
+          <div className="lg:col-span-1 lg:row-span-1 bg-warm-sand border border-ink/10 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+            <SiteDiagnostics />
           </div>
           
-          <div className="lg:col-span-2">
-            <SynergyGraph />
+          {/* Skill Evolution & Trends */}
+          <div className="lg:col-span-1 lg:row-span-1 bg-cream border border-ink/10 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+            <FutureProofScore />
           </div>
 
         </div>

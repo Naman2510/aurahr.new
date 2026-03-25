@@ -4,14 +4,14 @@ import { motion } from "framer-motion";
 import { Users } from "lucide-react";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
-export function TeamCollaborationGraph() {
+export function TeamCollaborationGraph({ scores }: { scores?: any }) {
   const data = [
-    { subject: 'Embedded C/C++', A: 95, B: 60, fullMark: 100 },
-    { subject: 'RTOS', A: 85, B: 40, fullMark: 100 },
-    { subject: 'Microcontrollers', A: 90, B: 75, fullMark: 100 },
-    { subject: 'IoT Protocols', A: 80, B: 85, fullMark: 100 },
-    { subject: 'Hardware Debugging', A: 75, B: 65, fullMark: 100 },
-    { subject: 'System Architecture', A: 85, B: 80, fullMark: 100 },
+    { subject: 'Technical', A: scores?.technical || 60, B: 70, fullMark: 100 },
+    { subject: 'Culture', A: scores?.culture || 50, B: 80, fullMark: 100 },
+    { subject: 'Communication', A: scores?.communication || 70, B: 60, fullMark: 100 },
+    { subject: 'Leadership', A: scores?.leadership || 40, B: 75, fullMark: 100 },
+    { subject: 'Adaptability', A: scores?.adaptability || 65, B: 85, fullMark: 100 },
+    { subject: 'Problem Solving', A: (scores?.technical || 60) + 10, B: 80, fullMark: 100 },
   ];
 
   return (

@@ -3,13 +3,16 @@
 import { motion } from "framer-motion";
 import { Code, Users, CheckCircle, Code2, Database } from "lucide-react";
 
-export function DigitalFootprintMiner() {
+export function DigitalFootprintMiner({ candidateName, role }: { candidateName?: string, role?: string }) {
+  // Simple deterministic seed based on name length
+  const seed = (candidateName?.length || 10) % 20;
+  
   const footprints = [
-    { source: "GitHub", icon: <Code className="w-4 h-4" />, score: 95, verified: true, color: "bg-ink", textColor: "text-warm-sand" },
-    { source: "LeetCode", icon: <Code2 className="w-4 h-4" />, score: 88, verified: true, color: "bg-rust/20", textColor: "text-rust" },
-    { source: "LinkedIn", icon: <Users className="w-4 h-4" />, score: 99, verified: true, color: "bg-[#0A66C2]/20", textColor: "text-[#0A66C2]" },
-    { source: "Kaggle", icon: <Database className="w-4 h-4" />, score: 40, verified: false, color: "bg-[#20BEFF]/20", textColor: "text-[#20BEFF]" },
-    { source: "GeeksforGeeks", icon: <Code2 className="w-4 h-4" />, score: 85, verified: true, color: "bg-sage/20", textColor: "text-sage" },
+    { source: "GitHub", icon: <Code className="w-4 h-4" />, score: 85 + seed, verified: true, color: "bg-ink", textColor: "text-warm-sand" },
+    { source: "LeetCode", icon: <Code2 className="w-4 h-4" />, score: 70 + (seed * 1.5), verified: true, color: "bg-rust/20", textColor: "text-rust" },
+    { source: "LinkedIn", icon: <Users className="w-4 h-4" />, score: 90 + (seed / 2), verified: true, color: "bg-[#0A66C2]/20", textColor: "text-[#0A66C2]" },
+    { source: "Kaggle", icon: <Database className="w-4 h-4" />, score: 30 + seed, verified: seed > 10, color: "bg-[#20BEFF]/20", textColor: "text-[#20BEFF]" },
+    { source: "StackOverflow", icon: <Code2 className="w-4 h-4" />, score: 65 + seed, verified: true, color: "bg-sage/20", textColor: "text-sage" },
   ];
 
   return (

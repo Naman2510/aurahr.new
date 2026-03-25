@@ -1,42 +1,67 @@
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
-import { crossReferenceSchema } from '@/app/api/parse-jd/route';
+import { prisma } from '@/lib/prisma';
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const jdId = searchParams.get('jdId');
+export async function POST(req: Request) {
+  try {
+    const { jdId } = await req.json();
 
-  const db = await getDb();
-  const jd = db.jobDescriptions?.find((j: any) => j.id === jdId) || db.jobDescriptions?.[0];
+    const jd = await prisma.jobDescription.findUnique({
+      where: { id: jdId }
+    });
 
-  if (!jd) {
-    return NextResponse.json({ error: 'No job description found' }, { status: 404 });
+    if (!jd) throw new Error("JD not found.");
+
+    const candidates = await prisma.candidate.findMany();
+
+    const scoredCandidates = candidates.map(c => {
+      let score = 0;
+      const reasons: string[] = [];
+
+      // A. Must-Have Match (Weight: 50%)
+      const mustHaveCount = jd.mustHave.filter(skill => 
+        c.skills.some(s => s.toLowerCase().includes(skill.toLowerCase()))
+      ).length;
+      const mustHaveScore = (mustHaveCount / jd.mustHave.length) * 50;
+      score += mustHaveScore;
+
+      // B. Good-to-Have Match (Weight: 20%)
+      const goodToHaveCount = jd.goodToHave.filter(skill => 
+        c.skills.some(s => s.toLowerCase().includes(skill.toLowerCase()))
+      ).length;
+      const goodToHaveScore = (goodToHaveCount / jd.goodToHave.length) * 20;
+      score += goodToHaveScore;
+
+      // C. Team Gap Bonus (Weight: 15%)
+      const teamGapCount = jd.teamGap.filter(skill => 
+        c.skills.some(s => s.toLowerCase().includes(skill.toLowerCase()))
+      ).length;
+      if (teamGapCount > 0) {
+        score += 15;
+        reasons.push("Fills a critical Team Gap.");
+      }
+
+      // D. Future-Proof Bonus (Weight: 15%)
+      const futureProofCount = jd.futureProof.filter(skill => 
+        c.skills.some(s => s.toLowerCase().includes(skill.toLowerCase()))
+      ).length;
+      if (futureProofCount > 0) {
+        score += 15;
+        reasons.push("High Market Alignment / Future-Proof Skills.");
+      }
+
+      return { 
+        ...c, 
+        matchScore: Math.round(score),
+        matchReason: reasons.join(' ')
+      };
+    });
+
+    const ranked = scoredCandidates.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
+
+    return NextResponse.json(ranked);
+
+  } catch (error: any) {
+    console.error("Smart Match Error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
-
-  const ranked = db.candidates.map((c: any) => {
-    const xref = crossReferenceSchema(
-      c.matchTags || [],
-      { mustHave: jd.mustHave || [], niceToHave: jd.niceToHave || [] }
-    );
-
-    return {
-      id: c.id,
-      name: c.name,
-      role: c.role,
-      status: c.status,
-      phone: c.phone,
-      institute: c.institute,
-      aiInterviewScore: c.aiInterviewScore,
-      salaryExpectation: c.salaryExpectation,
-      matchPct: Math.min(99, xref.overall_match_score),
-      matchedSkills: xref.must_haves_met,
-      missingSkills: xref.must_haves_missing,   // true must-have gaps only
-      must_haves_met: xref.must_haves_met,
-      must_haves_missing: xref.must_haves_missing,
-      nice_to_haves_met: xref.nice_to_haves_met,
-      source: c.source
-    };
-  }).sort((a: any, b: any) => b.matchPct - a.matchPct);
-
-  return NextResponse.json({ jd, ranked });
 }
