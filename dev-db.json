@@ -629,7 +629,7 @@
       "id": "c18",
       "name": "Rahul Dravid",
       "role": "Compliance Officer",
-      "status": "Offer",
+      "status": "Applied",
       "matchPercent": 71,
       "matchTags": [
         "Labour Law",
@@ -653,19 +653,7 @@
         "adaptability": 78
       },
       "interviewLogs": [],
-      "assessments": [],
-      "stageHistory": [
-        {
-          "from": "Applied",
-          "to": "Offer",
-          "timestamp": "2026-03-25T11:54:42.359Z"
-        },
-        {
-          "from": "Offer",
-          "to": "Offer",
-          "timestamp": "2026-03-25T11:54:44.249Z"
-        }
-      ]
+      "assessments": []
     },
     {
       "id": "c19",
@@ -981,24 +969,12 @@
   ],
   "jobDescriptions": [
     {
-      "id": "parsed_jd",
-      "title": "Senior VLSI Engineer",
-      "department": "Active",
-      "salaryBudget": 0,
-      "active": true,
-      "mustHave": [
-        "VLSI"
-      ],
-      "niceToHave": [],
-      "createdAt": "2026-03-25T16:12:11.194Z"
-    },
-    {
       "id": "jd1",
       "title": "Senior Full Stack Engineer",
       "department": "Engineering",
       "salaryBudget": 2800000,
       "active": true,
-      "createdAt": "2026-03-25T11:51:46.345Z",
+      "createdAt": "2026-03-25T21:47:00.496Z",
       "mustHave": [
         "React",
         "Node.js",
@@ -1019,7 +995,7 @@
       "department": "AI Research",
       "salaryBudget": 3200000,
       "active": true,
-      "createdAt": "2026-03-25T11:51:46.345Z",
+      "createdAt": "2026-03-25T21:47:00.496Z",
       "mustHave": [
         "Python",
         "Machine Learning",

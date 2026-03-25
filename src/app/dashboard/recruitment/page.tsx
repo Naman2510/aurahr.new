@@ -8,7 +8,11 @@ import {
   LayoutGrid, Link2
 } from 'lucide-react';
 import Papa from 'papaparse';
+import { DigitalFootprintMiner } from '@/components/experiments/DigitalFootprintMiner';
+import { MarketTrendEvolution } from '@/components/experiments/MarketTrendEvolution';
+import { TeamCollaborationGraph } from '@/components/experiments/TeamCollaborationGraph';
 import RadarChart from '@/components/RadarChart';
+import { motion } from 'framer-motion';
 
 type Candidate = {
   id: string; name: string; role: string; status: string;
@@ -399,6 +403,28 @@ export default function RecruitmentDashboard() {
                         </div>
                       </div>
                     )}
+
+                    {/* JD-Specific Analysis Charts Injected Here */}
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{ delay: 0.4, duration: 0.5, ease: "easeOut" }}
+                      className="mt-6 pt-6 border-t border-white/10"
+                    >
+                      <div className="text-xs font-mono text-gold/80 uppercase tracking-widest mb-4 flex items-center space-x-2">
+                        <BarChart3 className="w-4 h-4 text-gold" />
+                        <span>JD-Specific Analysis Result</span>
+                      </div>
+                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                        <div className="rounded-2xl overflow-hidden bg-cream shadow-sm min-h-[350px]">
+                          <TeamCollaborationGraph />
+                        </div>
+                        <div className="rounded-2xl overflow-hidden bg-warm-sand shadow-sm border border-white/5 min-h-[350px]">
+                          <MarketTrendEvolution />
+                        </div>
+                      </div>
+                    </motion.div>
+
                   </div>
                 )}
               </div>
@@ -749,6 +775,19 @@ export default function RecruitmentDashboard() {
         {/* ══════════════════ ANALYTICS TAB ══════════════════ */}
         {activeTab === 'Analytics' && analytics && (
           <div className="space-y-6">
+            
+            {/* NEEV CLOUD ANALYTICS MODULES (Features Injected) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 mt-2">
+              <div className="lg:col-span-1 rounded-2xl overflow-hidden bg-cream shadow-sm flex flex-col justify-center">
+                <DigitalFootprintMiner />
+              </div>
+            </div>
+
+            <h3 className="font-serif text-2xl text-white mb-4 mt-8 flex items-center border-t border-white/10 pt-8">
+              <BarChart3 className="text-gold w-6 h-6 mr-3" />
+              Standard Recruitment Telemetry
+            </h3>
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 { label: 'Avg. Time to Hire', value: `${analytics.timeToHireAvg}d`, icon: Clock, color: 'text-gold' },
