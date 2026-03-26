@@ -17,15 +17,29 @@ export type CandidateScore = {
   technical: number; culture: number; communication: number; leadership: number; adaptability: number;
 };
 
+export type AcademicQuestion = {
+  id: string; question: string; type: 'mcq' | 'text'; options?: string[]; correctAnswer: string;
+};
+
+export type AcademicSubmission = {
+  questionId: string; answer: string; isCorrect?: boolean; score?: number;
+};
+
+export type AcademicAssessment = {
+  id: string; questions: AcademicQuestion[]; submissions: AcademicSubmission[];
+  totalScore: number; completedAt?: string;
+};
+
 export type Candidate = {
   id: string; name: string; role: string;
   status: 'Applied' | 'Screened' | 'Interview' | 'Offer' | 'Rejected';
   score: CandidateScore; matchPercent: number; matchTags: string[];
   phone?: string; education?: string; institute?: string;
-  aiInterviewScore?: number; salaryExpectation?: number;
+  aiInterviewScore?: number; academiaScore?: number; salaryExpectation?: number;
   source?: string; gender?: string;
   interviewLogs?: InterviewLog[];
   assessments?: CandidateAssessment[];
+  academicAssessment?: AcademicAssessment;
   recruiterRating?: number;
   recruiterFeedback?: string;
   aiSummary?: string;

@@ -11,6 +11,7 @@ import Papa from 'papaparse';
 import { DigitalFootprintMiner } from '@/components/experiments/DigitalFootprintMiner';
 import { MarketTrendEvolution } from '@/components/experiments/MarketTrendEvolution';
 import { TeamCollaborationGraph } from '@/components/experiments/TeamCollaborationGraph';
+import AcademiaPerformanceChart from '@/components/experiments/AcademiaPerformanceChart';
 import RadarChart from '@/components/RadarChart';
 import { motion } from 'framer-motion';
 import JDAnalysisFourBox from '@/components/features/CandidateSuite/JDAnalysisFourBox';
@@ -20,7 +21,7 @@ type Candidate = {
   id: string; name: string; role: string; status: string;
   score: any; matchPercent: number; matchTags: string[];
   phone?: string; education?: string; institute?: string;
-  aiInterviewScore?: number; salaryExpectation?: number;
+  aiInterviewScore?: number; academiaScore?: number; salaryExpectation?: number;
   source?: string; gender?: string; profileStrength?: number;
   jdMatchRank?: string; matchedMust?: string[]; missingMust?: string[];
   recruiterRating?: number;
@@ -279,9 +280,10 @@ export default function RecruitmentDashboard() {
     const jd = c.matchPercent || 0;
     const ai = c.aiInterviewScore || 0;
     const recruiter = ((c.recruiterRating || 0) / 5) * 100;
+    const academia = c.academiaScore || 0;
     
-    // Balanced weighted score
-    return Math.round((jd * 0.3) + (ai * 0.4) + (recruiter * 0.3));
+    // Balanced weighted score (25% each)
+    return Math.round((jd * 0.25) + (ai * 0.25) + (recruiter * 0.25) + (academia * 0.25));
   };
 
   const sortedRanking = [...candidates].sort((a, b) => getFinalScore(b) - getFinalScore(a));
@@ -299,7 +301,12 @@ export default function RecruitmentDashboard() {
         <div className="flex items-center justify-between">
           <div>
             <span className="text-xs font-mono font-bold tracking-[0.2em] text-gold/70 uppercase mb-2 block">AI RECRUITMENT SUITE · IST OPTIMISED</span>
-            <h1 className="text-4xl font-serif text-white tracking-tight">Hiring Intelligence <span className="text-gold italic">Centre</span></h1>
+            <h1 className="text-4xl font-serif text-white tracking-tight flex items-center gap-4">
+              Hiring Intelligence <span className="text-gold italic">Centre</span>
+              <a href="/dashboard/recruitment/academia" className="bg-gold/10 border border-gold/20 text-gold px-4 py-1.5 rounded-full text-xs font-mono font-bold hover:bg-gold/20 transition-all flex items-center animate-pulse shadow-[0_0_15px_rgba(200,168,75,0.15)]">
+                <GraduationCap className="w-4 h-4 mr-2" /> Start Academia Round
+              </a>
+            </h1>
           </div>
           <div className="flex space-x-4">
             {[{ v: candidates.length, l: 'Candidates', c: 'text-gold' }, { v: candidates.filter(c => c.status === 'Offer').length, l: 'Offers', c: 'text-sage' }].map(s => (
@@ -815,6 +822,9 @@ export default function RecruitmentDashboard() {
                 <MarketTrendEvolution />
               </div>
               <div className="lg:col-span-2">
+                <AcademiaPerformanceChart candidates={candidates} />
+              </div>
+              <div className="lg:col-span-2">
                 <TeamCollaborationGraph />
               </div>
             </div>
@@ -824,12 +834,13 @@ export default function RecruitmentDashboard() {
               Standard Recruitment Telemetry
             </h3>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               {[
                 { label: 'Avg. Time to Hire', value: `${analytics.timeToHireAvg}d`, icon: Clock, color: 'text-gold' },
                 { label: 'Total Pipeline', value: analytics.total, icon: Users, color: 'text-sage' },
                 { label: 'Offers Extended', value: analytics.byStatus?.Offer || 0, icon: Star, color: 'text-rust' },
                 { label: 'AI Interviews Done', value: candidates.filter(c => c.aiInterviewScore).length, icon: Brain, color: 'text-gold' },
+                { label: 'Avg. Academia Score', value: Math.round(candidates.reduce((acc, c) => acc + (c.academiaScore || 0), 0) / (candidates.filter(c => c.academiaScore).length || 1)), icon: GraduationCap, color: 'text-gold' },
               ].map((s, i) => (
                 <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5">
                   <s.icon className={`w-5 h-5 ${s.color} mb-4 opacity-80`} />
@@ -893,8 +904,14 @@ export default function RecruitmentDashboard() {
                     </div>
                     
                     <div className="flex items-center space-x-8">
+                       <div className="text-center group-hover:scale-110 transition-transform">
+                          <div className="text-[9px] font-mono text-white/30 uppercase mb-1 flex items-center justify-center gap-1">
+                             <GraduationCap className="w-2.5 h-2.5" /> Acad
+                          </div>
+                          <div className="text-lg font-serif text-gold/80 italic">{c.academiaScore || 0}</div>
+                       </div>
                        <div className="text-center">
-                          <div className="text-[10px] font-mono text-white/30 uppercase mb-1">Score</div>
+                          <div className="text-[10px] font-mono text-white/30 uppercase mb-1">Final Score</div>
                           <div className="text-2xl font-serif text-gold">{getFinalScore(c)}</div>
                        </div>
                        <ChevronRight className="w-5 h-5 text-white/20 group-hover:text-gold transition-all" />
