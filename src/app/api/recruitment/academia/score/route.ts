@@ -4,7 +4,7 @@ import { getStructuredAIResponse } from '@/lib/neev';
 
 export async function POST(req: Request) {
   try {
-    const { candidateId, submissions } = await req.json();
+    const { candidateId, submissions, proctoringSignals } = await req.json();
     const db = await getDb();
     const candidate = db.candidates.find(c => c.id === candidateId);
 
@@ -50,6 +50,7 @@ export async function POST(req: Request) {
 
     candidate.academicAssessment.submissions = evaluatedSubmissions;
     candidate.academicAssessment.totalScore = totalScore;
+    (candidate.academicAssessment as any).proctoringSignals = proctoringSignals || [];
     candidate.academicAssessment.completedAt = new Date().toISOString();
     candidate.academiaScore = totalScore;
     candidate.status = 'Screened'; // Move to next stage after successful academia round

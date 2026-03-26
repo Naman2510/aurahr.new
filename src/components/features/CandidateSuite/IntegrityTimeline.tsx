@@ -4,49 +4,53 @@ import React from "react";
 import { motion } from "framer-motion";
 import { ShieldAlert, Monitor, Eye, Clock } from "lucide-react";
 
-const EVENTS = [
-  { time: "10:02 AM", event: "Webcam Started", type: "success", icon: Monitor },
-  { time: "10:05 AM", event: "Eye-Tracking Verified", type: "success", icon: Eye },
-  { time: "10:12 AM", event: "Tab Switch Detected", type: "warning", icon: ShieldAlert, note: "Duration: 4s" },
-  { time: "10:18 AM", event: "Browser Focus Lost", type: "warning", icon: ShieldAlert, note: "Duration: 2s" },
-  { time: "10:25 AM", event: "Proctoring Session Ended", type: "info", icon: Clock },
-];
+export type IntegrityEvent = {
+  time: string;
+  event: string;
+  type: 'success' | 'warning' | 'info';
+  icon: any;
+  note?: string;
+};
 
-export default function IntegrityTimeline() {
+export default function IntegrityTimeline({ events }: { events: IntegrityEvent[] }) {
+  const displayEvents = events.length > 0 ? events : [
+    { time: "System", event: "Awaiting Session Start…", type: "info" as const, icon: Clock },
+  ];
+
   return (
-    <div className="w-full bg-slate-900 border border-slate-800 rounded-3xl p-6">
-      <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-        <ShieldAlert className="w-5 h-5 text-amber-500" />
+    <div className="w-full bg-white/5 border border-white/10 rounded-3xl p-6">
+      <h3 className="text-xl font-serif text-white mb-6 flex items-center gap-2">
+        <ShieldAlert className="w-5 h-5 text-gold" />
         Integrity Timeline
       </h3>
 
       <div className="space-y-6 relative">
         {/* Vertical line */}
-        <div className="absolute left-[11px] top-2 bottom-2 w-px bg-slate-800" />
+        <div className="absolute left-[11px] top-2 bottom-2 w-px bg-white/10" />
 
-        {EVENTS.map((item, i) => (
+        {displayEvents.map((item, i) => (
           <motion.div 
             key={i}
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.1 }}
+            transition={{ delay: 0.1 }}
             className="flex gap-4 relative"
           >
-            <div className={`mt-1.5 w-6 h-6 rounded-full flex items-center justify-center z-10 border-2 ${
-              item.type === 'warning' ? 'bg-amber-950 border-amber-500 text-amber-500' : 
-              item.type === 'success' ? 'bg-emerald-950 border-emerald-500 text-emerald-500' :
-              'bg-indigo-950 border-indigo-500 text-indigo-500'
+            <div className={`mt-1.5 w-6 h-6 rounded-full flex items-center justify-center z-10 border ${
+              item.type === 'warning' ? 'bg-red-900/20 border-red-500 text-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 
+              item.type === 'success' ? 'bg-sage/20 border-sage text-sage' :
+              'bg-white/10 border-white/20 text-white/40'
             }`}>
-              <item.icon className="w-3 h-3" />
+              {item.icon ? <item.icon className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
             </div>
             
             <div className="flex-1">
               <div className="flex justify-between items-start">
-                <span className="text-sm font-semibold text-slate-200">{item.event}</span>
-                <span className="text-[10px] font-mono text-slate-500 uppercase">{item.time}</span>
+                <span className="text-sm font-bold text-white/80">{item.event}</span>
+                <span className="text-[10px] font-mono text-white/30 uppercase">{item.time}</span>
               </div>
               {item.note && (
-                <p className="text-xs text-slate-400 mt-1 italic">{item.note}</p>
+                <p className="text-[10px] text-white/40 mt-1 italic font-mono">{item.note}</p>
               )}
             </div>
           </motion.div>

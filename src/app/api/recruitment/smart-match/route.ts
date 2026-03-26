@@ -1,67 +1,57 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getDb } from '@/lib/db';
 
-export async function POST(req: Request) {
+export async function GET() {
   try {
-    const { jdId } = await req.json();
+    const db = await getDb();
+    
+    // 1. Get the first active Job Description as the primary matching target
+    const jd = db.jobDescriptions.find(j => j.active) || db.jobDescriptions[0];
 
-    const jd = await prisma.jobDescription.findUnique({
-      where: { id: jdId }
-    });
+    if (!jd) {
+      return NextResponse.json({ 
+        jd: { title: "No Active JD Found" }, 
+        ranked: [] 
+      });
+    }
 
-    if (!jd) throw new Error("JD not found.");
+    // 2. Score candidates against the JD
+    const ranked = db.candidates.map(c => {
+      // Basic matching logic using must-haves and nice-to-haves
+      const matchedMust = jd.mustHave.filter(skill => 
+        (c.matchTags || []).some(t => t.toLowerCase().includes(skill.toLowerCase()))
+      );
+      
+      const matchedNice = jd.niceToHave.filter(skill => 
+        (c.matchTags || []).some(t => t.toLowerCase().includes(skill.toLowerCase()))
+      );
 
-    const candidates = await prisma.candidate.findMany();
+      const missingMust = jd.mustHave.filter(skill => !matchedMust.includes(skill));
 
-    const scoredCandidates = candidates.map(c => {
-      let score = 0;
-      const reasons: string[] = [];
+      // Calculate a dynamic match percentage for this specific JD
+      const mustWeight = 0.7;
+      const niceWeight = 0.3;
+      
+      const mustScore = jd.mustHave.length > 0 ? (matchedMust.length / jd.mustHave.length) * 100 : 100;
+      const niceScore = jd.niceToHave.length > 0 ? (matchedNice.length / jd.niceToHave.length) * 100 : 100;
+      
+      const matchPct = Math.round((mustScore * mustWeight) + (niceScore * niceWeight));
 
-      // A. Must-Have Match (Weight: 50%)
-      const mustHaveCount = jd.mustHave.filter(skill => 
-        c.skills.some(s => s.toLowerCase().includes(skill.toLowerCase()))
-      ).length;
-      const mustHaveScore = (mustHaveCount / jd.mustHave.length) * 50;
-      score += mustHaveScore;
-
-      // B. Good-to-Have Match (Weight: 20%)
-      const goodToHaveCount = jd.goodToHave.filter(skill => 
-        c.skills.some(s => s.toLowerCase().includes(skill.toLowerCase()))
-      ).length;
-      const goodToHaveScore = (goodToHaveCount / jd.goodToHave.length) * 20;
-      score += goodToHaveScore;
-
-      // C. Team Gap Bonus (Weight: 15%)
-      const teamGapCount = jd.teamGap.filter(skill => 
-        c.skills.some(s => s.toLowerCase().includes(skill.toLowerCase()))
-      ).length;
-      if (teamGapCount > 0) {
-        score += 15;
-        reasons.push("Fills a critical Team Gap.");
-      }
-
-      // D. Future-Proof Bonus (Weight: 15%)
-      const futureProofCount = jd.futureProof.filter(skill => 
-        c.skills.some(s => s.toLowerCase().includes(skill.toLowerCase()))
-      ).length;
-      if (futureProofCount > 0) {
-        score += 15;
-        reasons.push("High Market Alignment / Future-Proof Skills.");
-      }
-
-      return { 
-        ...c, 
-        matchScore: Math.round(score),
-        matchReason: reasons.join(' ')
+      return {
+        ...c,
+        matchPct,
+        matchedSkills: [...matchedMust, ...matchedNice],
+        missingSkills: missingMust
       };
+    }).sort((a, b) => b.matchPct - a.matchPct);
+
+    return NextResponse.json({
+      jd,
+      ranked
     });
-
-    const ranked = scoredCandidates.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
-
-    return NextResponse.json(ranked);
 
   } catch (error: any) {
-    console.error("Smart Match Error:", error);
+    console.error("Smart Match API Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
